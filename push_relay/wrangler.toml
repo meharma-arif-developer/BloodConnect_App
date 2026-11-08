@@ -1,0 +1,7 @@
+name = "bloodconnect-push-relay"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "bloodconnect-f8c69"
+# The secret SERVICE_ACCOUNT_JSON is added with:  npx wrangler secret put SERVICE_ACCOUNT_JSON

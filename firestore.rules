@@ -1,0 +1,323 @@
+rules_version = '2';
+
+// ============================================================
+// BloodConnect - Firestore security rules
+// ------------------------------------------------------------
+// Admin access uses a Firebase Auth CUSTOM CLAIM (token.admin),
+// which can only be set from trusted server code. It is NEVER
+// read from a Firestore field that users could edit.
+// ============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Keys that differ between the stored document and the new one.
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // True unless an admin suspended this user (works on the free plan).
+    function notSuspended() {
+      return !exists(/databases/$(database)/documents/suspended_users/$(request.auth.uid));
+    }
+
+    function validBloodGroup(g) {
+      return g in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    }
+
+    function docPath(col, id) {
+      return /databases/$(database)/documents/$(col)/$(id);
+    }
+
+    // ---------- users (PRIVATE: phone, email, settings) ----------
+    match /users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Users may only register as donor or receiver. 'admin' can
+      // never be self-assigned.
+      allow create: if isSelf(userId)
+        && notSuspended()
+        && request.resource.data.role in ['donor', 'receiver']
+        && request.resource.data.isActive == true;
+
+      // role / isActive / createdAt can never be changed by the user.
+      allow update: if (isSelf(userId)
+          && !changed().hasAny(['role', 'isActive', 'createdAt']))
+        || isAdmin();
+
+      allow delete: if isSelf(userId) || isAdmin();
+
+      // Private push-notification tokens (one doc per device).
+      match /fcm_tokens/{tokenId} {
+        allow read, write: if isSelf(userId);
+      }
+
+      // People this user has blocked.
+      match /blocked/{blockedId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    // ---------- donor_profiles (PUBLIC to signed-in users) ----------
+    // Phone and email must NOT be stored here.
+    match /donor_profiles/{donorId} {
+      allow read: if signedIn();
+
+      allow create: if isSelf(donorId)
+        && notSuspended()
+        && request.resource.data.userId == donorId
+        && request.resource.data.isActive == true
+        && validBloodGroup(request.resource.data.bloodGroup)
+        && !('phone' in request.resource.data)
+        && !('email' in request.resource.data);
+
+      allow update: if (isSelf(donorId)
+          && request.resource.data.userId == donorId
+          && changed().hasOnly([
+            'userId', 'name', 'bloodGroup', 'city', 'country', 'area',
+            'donorAvailable', 'profileImageUrl', 'updatedAt',
+            'latitude', 'longitude', 'locationUpdatedAt'
+          ]))
+        || isAdmin();
+
+      allow delete: if isSelf(donorId) || isAdmin();
+    }
+
+    // ---------- blood_requests ----------
+    match /blood_requests/{requestId} {
+
+      // A missing document may be "read" (returns not-found) so that
+      // transactions work; real documents are visible only to the
+      // owner, an invited donor, or an admin.
+      allow get: if signedIn()
+        && (resource == null
+          || isAdmin()
+          || resource.data.requesterId == request.auth.uid
+          || exists(docPath('donor_requests', requestId + '_' + request.auth.uid)));
+
+      allow list: if isAdmin()
+        || (signedIn() && resource.data.requesterId == request.auth.uid);
+
+      allow create: if signedIn()
+        && notSuspended()
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && !('acceptedDonorId' in request.resource.data)
+        && validBloodGroup(request.resource.data.bloodGroup)
+        && request.resource.data.unitsRequired is int
+        && request.resource.data.unitsRequired >= 1;
+
+      allow update: if isAdmin()
+
+        // Owner cancels while still pending.
+        || (signedIn()
+          && resource.data.requesterId == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+          && changed().hasOnly(['status', 'updatedAt']))
+
+        // An INVITED donor accepts (only while pending, only as themselves).
+        || (signedIn()
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.acceptedDonorId == request.auth.uid
+          && changed().hasOnly(['status', 'acceptedDonorId', 'updatedAt'])
+          && get(docPath('donor_requests', requestId + '_' + request.auth.uid)).data.status == 'pending')
+
+        // The ASSIGNED donor completes.
+        || (signedIn()
+          && resource.data.status == 'accepted'
+          && resource.data.acceptedDonorId == request.auth.uid
+          && request.resource.data.status == 'completed'
+          && changed().hasOnly(['status', 'updatedAt']));
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------- donor_requests (id = bloodRequestId_donorId) ----------
+    match /donor_requests/{donorRequestId} {
+
+      allow get: if isAdmin()
+        || (signedIn() && resource == null
+          && get(docPath('blood_requests', donorRequestId.split('_')[0])).data.requesterId == request.auth.uid)
+        || (signedIn() && resource != null
+          && (resource.data.donorId == request.auth.uid
+            || resource.data.requesterId == request.auth.uid));
+
+      allow list: if isAdmin()
+        || (signedIn()
+          && (resource.data.donorId == request.auth.uid
+            || resource.data.requesterId == request.auth.uid));
+
+      // Only the owner of a pending blood request can invite an
+      // available, active donor - one invitation per request+donor.
+      allow create: if signedIn()
+        && notSuspended()
+        && donorRequestId == request.resource.data.bloodRequestId + '_' + request.resource.data.donorId
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.donorId != request.auth.uid
+        && request.resource.data.status == 'pending'
+        && !exists(/databases/$(database)/documents/users/$(request.resource.data.donorId)/blocked/$(request.auth.uid))
+        && get(docPath('blood_requests', request.resource.data.bloodRequestId)).data.requesterId == request.auth.uid
+        && get(docPath('blood_requests', request.resource.data.bloodRequestId)).data.status == 'pending'
+        && get(docPath('donor_profiles', request.resource.data.donorId)).data.donorAvailable == true
+        && get(docPath('donor_profiles', request.resource.data.donorId)).data.get('isActive', true) != false;
+
+      // Only the invited donor responds, and only with valid transitions:
+      // pending -> accepted | rejected,  accepted -> completed.
+      allow update: if isAdmin()
+        || (signedIn()
+          && notSuspended()
+          && resource.data.donorId == request.auth.uid
+          && changed().hasOnly([
+            'status', 'responseAt', 'updatedAt', 'donorPhone', 'requesterPhone'
+          ])
+          && ((resource.data.status == 'pending'
+              && request.resource.data.status == 'rejected'
+              && changed().hasOnly(['status', 'responseAt', 'updatedAt']))
+            // Accepting shares the donor's own phone and the request's phone
+            // - values are checked against the real documents.
+            || (resource.data.status == 'pending'
+              && request.resource.data.status == 'accepted'
+              && request.resource.data.donorPhone
+                == get(docPath('users', request.auth.uid)).data.get('phone', '')
+              && request.resource.data.requesterPhone
+                == get(docPath('blood_requests', resource.data.bloodRequestId)).data.get('requesterPhone', ''))
+            || (resource.data.status == 'accepted'
+              && request.resource.data.status == 'completed'
+              && changed().hasOnly(['status', 'updatedAt']))));
+
+      allow delete: if isAdmin();
+
+      // ---------- chat between the donor and the receiver ----------
+      // Only these two people, and new messages only while the request
+      // is "accepted". Messages cannot be edited, and cannot be sent to
+      // someone who blocked the sender.
+      match /messages/{messageId} {
+        function drData() {
+          return get(/databases/$(database)/documents/donor_requests/$(donorRequestId)).data;
+        }
+
+        function isParticipant() {
+          return signedIn()
+            && (drData().donorId == request.auth.uid
+              || drData().requesterId == request.auth.uid);
+        }
+
+        function otherPerson() {
+          return drData().donorId == request.auth.uid
+            ? drData().requesterId
+            : drData().donorId;
+        }
+
+        allow read: if isParticipant() || isAdmin();
+
+        allow create: if isParticipant()
+          && notSuspended()
+          && drData().status == 'accepted'
+          && !exists(/databases/$(database)/documents/users/$(otherPerson())/blocked/$(request.auth.uid))
+          && request.resource.data.keys().hasOnly(['senderId', 'text', 'createdAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.createdAt == request.time;
+
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ---------- reports (users can file; only admins can read/manage) ----------
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.reportedUserId != request.auth.uid
+        && request.resource.data.status == 'open';
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ---------- blood camps / events (hospitals, donors, admins or anyone) ----------
+    // Every signed-in user can read. Anyone who is not suspended can post
+    // a camp. Only the poster or an admin can delete it. Camps cannot be edited.
+    match /blood_camps/{campId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && notSuspended()
+        && request.resource.data.keys().hasOnly([
+          'title', 'organizer', 'organizerType', 'city', 'address', 'date',
+          'timeText', 'phone', 'description', 'createdBy', 'createdAt',
+          'latitude', 'longitude'
+        ])
+        && request.resource.data.keys().hasAll([
+          'title', 'organizer', 'organizerType', 'city', 'address', 'date',
+          'createdBy', 'createdAt'
+        ])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3
+        && request.resource.data.title.size() <= 80
+        && request.resource.data.organizer is string
+        && request.resource.data.organizer.size() >= 2
+        && request.resource.data.organizer.size() <= 80
+        && request.resource.data.organizerType in
+             ['Hospital', 'Blood Donor', 'Organization / NGO', 'Other']
+        && request.resource.data.city is string
+        && request.resource.data.city.size() >= 2
+        && request.resource.data.city.size() <= 60
+        && request.resource.data.address is string
+        && request.resource.data.address.size() >= 3
+        && request.resource.data.address.size() <= 160
+        && request.resource.data.date is timestamp
+        && request.resource.data.date > request.time - duration.value(2, 'd')
+        && request.resource.data.date < request.time + duration.value(400, 'd')
+        && request.resource.data.get('timeText', '') is string
+        && request.resource.data.get('timeText', '').size() <= 60
+        && request.resource.data.get('phone', '') is string
+        && request.resource.data.get('phone', '').size() <= 20
+        && request.resource.data.get('description', '') is string
+        && request.resource.data.get('description', '').size() <= 300
+        && request.resource.data.get('latitude', 0) is number
+        && request.resource.data.get('longitude', 0) is number;
+
+      allow update: if false;
+
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.createdBy == request.auth.uid);
+    }
+
+    // ---------- admin audit log (admins append entries; nobody edits or deletes) ----------
+    match /admin_audit/{auditId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.adminUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---------- suspended accounts (admins write, the user can only read) ----------
+    match /suspended_users/{userId} {
+      allow get: if isSelf(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ---------- everything else is denied ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BloodConnect Admin</title>
+<style>
+  :root { --red:#E53935; --red2:#C62828; --bg:#F4F6FA; --card:#fff; --text:#1c1c1e; --muted:#6b6b70; --line:#e8e8ee; --ok:#2e7d32; --warn:#ef6c00; --shadow:0 4px 18px rgba(20,20,40,.06); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1012; --card:#1b1c1f; --text:#f2f2f2; --muted:#9fa0a8; --line:#2c2d32; --shadow:none; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Roboto, system-ui, Arial, sans-serif; background:var(--bg); color:var(--text); }
+  .hidden { display:none !important; }
+  /* ---------- login ---------- */
+  .login-wrap { min-height:100vh; display:grid; place-items:center; padding:20px; background:linear-gradient(135deg,#E53935,#8E1B1B); }
+  .login { width:100%; max-width:400px; background:var(--card); border-radius:24px; padding:32px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .logo { width:56px; height:56px; border-radius:18px; background:var(--red); color:#fff; display:grid; place-items:center; font-size:28px; margin-bottom:14px; }
+  .login h2 { margin:0 0 4px; } .login p.sub { margin:0 0 18px; color:var(--muted); font-size:14px; }
+  label { font-size:12px; color:var(--muted); display:block; margin:12px 0 6px; font-weight:600; }
+  input, select, textarea { width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:14px; font-family:inherit; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--red); border-color:transparent; }
+  .btn { background:var(--red); color:#fff; border:0; padding:11px 18px; border-radius:12px; font-weight:700; cursor:pointer; font-size:14px; }
+  .btn:hover { background:var(--red2); } .btn:disabled { opacity:.6; cursor:default; }
+  .btn.small { padding:6px 11px; font-size:12px; border-radius:9px; }
+  .btn.ghost { background:transparent; color:var(--red); border:1px solid var(--red); } .btn.ghost:hover { background:rgba(229,57,53,.08); }
+  .btn.green { background:var(--ok); } .btn.gray { background:var(--line); color:var(--text); }
+  /* ---------- layout ---------- */
+  .app { display:grid; grid-template-columns:230px 1fr; min-height:100vh; }
+  aside { background:var(--card); border-right:1px solid var(--line); padding:20px 14px; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:17px; padding:0 8px 18px; }
+  .brand .logo { width:38px; height:38px; font-size:20px; margin:0; border-radius:12px; }
+  nav button { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:11px 12px; margin-bottom:4px; border:0; border-radius:12px; background:transparent; color:var(--text); font-size:14px; cursor:pointer; }
+  nav button:hover { background:var(--bg); } nav button.active { background:var(--red); color:#fff; font-weight:700; }
+  .side-foot { margin-top:auto; font-size:12px; color:var(--muted); padding:8px; }
+  main { padding:26px; max-width:1200px; width:100%; }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; gap:12px; flex-wrap:wrap; }
+  .top h1 { margin:0; font-size:24px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px; box-shadow:var(--shadow); }
+  .grid { display:grid; gap:14px; } .kpis { grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); }
+  .two { grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); margin-top:14px; }
+  .kpi { display:flex; gap:14px; align-items:center; }
+  .kpi .ic { width:46px; height:46px; border-radius:14px; display:grid; place-items:center; font-size:22px; background:rgba(229,57,53,.12); }
+  .kpi b { font-size:28px; display:block; line-height:1.1; } .kpi span { color:var(--muted); font-size:12.5px; }
+  h3 { margin:0 0 14px; font-size:15px; }
+  .bar { display:grid; grid-template-columns:90px 1fr 36px; gap:10px; align-items:center; font-size:13px; margin:9px 0; }
+  .bar .track { background:var(--bg); border-radius:8px; height:12px; overflow:hidden; } .bar .fill { height:100%; background:linear-gradient(90deg,#EF5350,#C62828); border-radius:8px; transition:width .5s; }
+  .row { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; } .row input { max-width:340px; } .row select { max-width:180px; }
+  .wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:11px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.3px; }
+  tr:last-child td { border-bottom:0; } code { font-size:11px; color:var(--muted); word-break:break-all; }
+  .pill { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; background:var(--line); display:inline-block; }
+  .pill.red { background:#FFEBEE; color:#C62828; } .pill.green { background:#E8F5E9; color:var(--ok); } .pill.orange { background:#FFF3E0; color:var(--warn); } .pill.blue { background:#E3F2FD; color:#1565C0; }
+  .msg { padding:14px; border-radius:12px; margin:10px 0; } .msg.err { background:#FFEBEE; color:#C62828; } .msg.empty { color:var(--muted); text-align:center; padding:30px; }
+  .skeleton { height:90px; border-radius:18px; background:linear-gradient(90deg,var(--line),var(--card),var(--line)); background-size:200% 100%; animation:sh 1.2s infinite; }
+  @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  /* ---------- modal + toast ---------- */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); display:grid; place-items:center; padding:16px; z-index:50; }
+  .modal { background:var(--card); border-radius:20px; padding:22px; width:100%; max-width:420px; } .modal h3 { font-size:17px; } .modal .actions { display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+  #toasts { position:fixed; right:18px; bottom:18px; display:grid; gap:8px; z-index:60; }
+  .toast { background:#222; color:#fff; padding:12px 16px; border-radius:12px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.25); } .toast.err { background:#C62828; } .toast.ok { background:#2e7d32; }
+  @media (max-width:820px) {
+    .app { grid-template-columns:1fr; } aside { position:static; height:auto; flex-direction:row; flex-wrap:wrap; align-items:center; padding:12px; }
+    .brand { padding:0 10px 0 0; } nav { display:flex; gap:4px; flex-wrap:wrap; } nav button { width:auto; margin:0; padding:8px 12px; } .side-foot { display:none; } main { padding:16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginView" class="login-wrap">
+  <div class="login">
+    <div class="logo">&#10084;</div>
+    <h2>BloodConnect Admin</h2>
+    <p class="sub">Sign in with an administrator account.</p>
+    <label for="email">Email</label><input id="email" type="email" autocomplete="username">
+    <label for="password">Password</label><input id="password" type="password" autocomplete="current-password">
+    <div id="loginMsg"></div>
+    <p><button id="loginBtn" class="btn" style="width:100%">Sign in</button></p>
+    <p style="text-align:center;margin:0 0 10px"><a href="#" id="forgotLink" style="color:var(--red);font-size:13px">Forgot password?</a></p>
+    <p class="sub" style="font-size:12px;margin:0">Only accounts with the admin permission can enter.</p>
+  </div>
+</div>
+
+<div id="appView" class="app hidden">
+  <aside>
+    <div class="brand"><div class="logo">&#10084;</div>BloodConnect</div>
+    <nav id="nav">
+      <button data-tab="overview" class="active">&#128202; Overview</button>
+      <button data-tab="users">&#128101; Users</button>
+      <button data-tab="requests">&#129656; Blood Requests</button>
+      <button data-tab="reports">&#9888;&#65039; Reports</button>
+      <button data-tab="camps">&#128197; Blood Camps</button>
+      <button data-tab="audit">&#128221; Audit Log</button>
+    </nav>
+    <div class="side-foot"><div id="adminEmail"></div><button id="logoutBtn" class="btn small ghost" style="margin-top:8px">Sign out</button></div>
+  </aside>
+  <main>
+    <div class="top"><h1 id="title">Overview</h1><button id="refreshBtn" class="btn small gray">&#8635; Refresh</button></div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<div id="toasts"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { getFirestore, collection, query, orderBy, limit, where, getDocs, getDoc, getCountFromServer, doc, updateDoc, writeBatch, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+// Public web config (same values as lib/firebase_options.dart, web section).
+const app = initializeApp({
+  apiKey: 'AIzaSyC4PMqUWxH7HwHotTDbcQdYExeOLYgpP7A',
+  authDomain: 'bloodconnect-f8c69.firebaseapp.com',
+  projectId: 'bloodconnect-f8c69',
+  storageBucket: 'bloodconnect-f8c69.firebasestorage.app',
+  messagingSenderId: '516582333359',
+  appId: '1:516582333359:web:c820a38ad15fd05f69ad5a',
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const $ = (id) => document.getElementById(id);
+// Escape EVERYTHING that comes from the database before putting it in HTML.
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const fmt = (ts) => (ts && ts.toDate ? ts.toDate().toLocaleString() : '');
+const TITLES = { overview:'Overview', users:'Users', requests:'Blood Requests', reports:'Reports', camps:'Blood Camps', audit:'Audit Log' };
+let tab = 'overview', usersCache = [];
+
+function toast(text, kind = '') {
+  const t = document.createElement('div'); t.className = 'toast ' + kind; t.textContent = text;
+  $('toasts').appendChild(t); setTimeout(() => t.remove(), 4500);
+}
+function showError(el, e) {
+  const denied = e && e.code === 'permission-denied';
+  el.innerHTML = `<div class="msg err">${denied ? 'Permission denied. Is this account an admin?' : 'Something went wrong: ' + esc(e && e.message)}</div>`;
+}
+function ask({ title, text, input, confirmLabel = 'Confirm' }) {
+  return new Promise((resolve) => {
+    const o = document.createElement('div'); o.className = 'overlay';
+    o.innerHTML = `<div class="modal"><h3>${esc(title)}</h3><div style="color:var(--muted);font-size:14px">${esc(text)}</div>${input ? `<label>${esc(input)}</label><textarea id="mInput" rows="3"></textarea>` : ''}<div class="actions"><button class="btn gray" id="mNo">Cancel</button><button class="btn" id="mYes">${esc(confirmLabel)}</button></div></div>`;
+    document.body.appendChild(o);
+    const done = (v) => { o.remove(); resolve(v); };
+    o.querySelector('#mNo').onclick = () => done(null);
+    o.querySelector('#mYes').onclick = () => done(input ? (o.querySelector('#mInput').value.trim() || '(no reason given)') : true);
+  });
+}
+
+// ---------------- auth ----------------
+$('loginBtn').onclick = async () => {
+  $('loginMsg').innerHTML = ''; $('loginBtn').disabled = true;
+  try { await signInWithEmailAndPassword(auth, $('email').value.trim(), $('password').value); }
+  catch (e) { $('loginMsg').innerHTML = '<div class="msg err">Sign in failed. Check your email and password.</div>'; }
+  $('loginBtn').disabled = false;
+};
+$('password').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginBtn').click(); });
+$('logoutBtn').onclick = () => signOut(auth);
+$('forgotLink').onclick = async (e) => {
+  e.preventDefault();
+  const email = $('email').value.trim();
+  if (!email) { $('loginMsg').innerHTML = '<div class="msg err">Type your admin email first.</div>'; return; }
+  try { await sendPasswordResetEmail(auth, email); } catch (err) { /* same message either way */ }
+  $('loginMsg').innerHTML = '<div class="msg" style="background:#E8F5E9;color:#2e7d32">If this email has an account, a reset link was sent.</div>';
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { $('loginView').classList.remove('hidden'); $('appView').classList.add('hidden'); return; }
+  const token = await user.getIdTokenResult(true);
+  if (token.claims.admin !== true) {
+    await signOut(auth);
+    $('loginMsg').innerHTML = '<div class="msg err">This account is not an administrator.</div>';
+    return;
+  }
+  $('adminEmail').textContent = user.email;
+  $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden');
+  render();
+});
+
+document.querySelectorAll('#nav button').forEach((b) => b.onclick = () => {
+  document.querySelectorAll('#nav button').forEach((x) => x.classList.remove('active'));
+  b.classList.add('active'); tab = b.dataset.tab; render();
+});
+$('refreshBtn').onclick = () => render();
+
+function render() {
+  $('title').textContent = TITLES[tab];
+  $('content').innerHTML = '<div class="grid kpis"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+  ({ overview: renderOverview, users: renderUsers, requests: renderRequests, reports: renderReports, camps: renderCamps, audit: renderAudit })[tab]();
+}
+
+// ---------------- overview ----------------
+const count = async (q) => (await getCountFromServer(q)).data().count;
+const bars = (rows) => { const max = Math.max(1, ...rows.map((r) => r[1])); return rows.map(([l, n]) => `<div class="bar"><span>${esc(l)}</span><div class="track"><div class="fill" style="width:${Math.round((n / max) * 100)}%"></div></div><b>${n}</b></div>`).join(''); };
+
+async function renderOverview() {
+  const c = $('content');
+  try {
+    const BG = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    const ST = ['pending', 'accepted', 'completed', 'cancelled'];
+    const [users, donors, receivers, openReports, suspended, st, bg, recentReq, recentRep] = await Promise.all([
+      count(collection(db, 'users')),
+      count(query(collection(db, 'users'), where('role', '==', 'donor'))),
+      count(query(collection(db, 'users'), where('role', '==', 'receiver'))),
+      count(query(collection(db, 'reports'), where('status', '==', 'open'))),
+      count(collection(db, 'suspended_users')),
+      Promise.all(ST.map((s) => count(query(collection(db, 'blood_requests'), where('status', '==', s))))),
+      Promise.all(BG.map((g) => count(query(collection(db, 'donor_profiles'), where('bloodGroup', '==', g))))),
+      getDocs(query(collection(db, 'blood_requests'), orderBy('createdAt', 'desc'), limit(5))),
+      getDocs(query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(5))),
+    ]);
+    const k = (ic, n, l) => `<div class="card kpi"><div class="ic">${ic}</div><div><b>${n}</b><span>${l}</span></div></div>`;
+    const reqRows = recentReq.docs.map((d) => { const r = d.data(); return `<tr><td><b>${esc(r.bloodGroup)}</b></td><td>${esc(r.hospitalName)}<br><code>${esc(r.city)}</code></td><td><span class="pill ${r.status === 'pending' ? 'orange' : r.status === 'cancelled' ? 'red' : 'green'}">${esc(r.status)}</span></td></tr>`; }).join('') || '<tr><td class="msg empty" colspan="3">No requests yet.</td></tr>';
+    const repRows = recentRep.docs.map((d) => { const r = d.data(); return `<tr><td>${esc(r.reason)}</td><td><code>${esc(r.reportedUserId)}</code></td><td><span class="pill ${r.status === 'open' ? 'orange' : 'green'}">${esc(r.status)}</span></td></tr>`; }).join('') || '<tr><td class="msg empty" colspan="3">No reports yet.</td></tr>';
+    c.innerHTML = `
+      <div class="grid kpis">${k('&#128101;', users, 'Registered users')}${k('&#129656;', donors, 'Donors')}${k('&#128140;', receivers, 'Receivers')}${k('&#9889;', st[0] + st[1], 'Active requests')}${k('&#9888;&#65039;', openReports, 'Open reports')}${k('&#128683;', suspended, 'Suspended accounts')}</div>
+      <div class="grid two">
+        <div class="card"><h3>Requests by status</h3>${bars(ST.map((s, i) => [s, st[i]]))}</div>
+        <div class="card"><h3>Donors by blood group</h3>${bars(BG.map((g, i) => [g, bg[i]]))}</div>
+      </div>
+      <div class="grid two">
+        <div class="card wrap"><h3>Latest blood requests</h3><table><thead><tr><th>Blood</th><th>Hospital</th><th>Status</th></tr></thead><tbody>${reqRows}</tbody></table></div>
+        <div class="card wrap"><h3>Latest reports</h3><table><thead><tr><th>Reason</th><th>Reported user</th><th>Status</th></tr></thead><tbody>${repRows}</tbody></table></div>
+      </div>`;
+  } catch (e) { showError(c, e); }
+}
+
+// ---------------- users ----------------
+async function renderUsers() {
+  const c = $('content');
+  try {
+    const [snap, susp] = await Promise.all([getDocs(query(collection(db, 'users'), limit(300))), getDocs(collection(db, 'suspended_users'))]);
+    const suspendedIds = new Set(susp.docs.map((d) => d.id));
+    usersCache = snap.docs.map((d) => ({ id: d.id, ...d.data(), _suspended: suspendedIds.has(d.id) || d.data().isActive === false }));
+    c.innerHTML = `<div class="row"><input id="uq" placeholder="Search name, email, phone, city, country..."><select id="urole"><option value="">All roles</option><option value="donor">Donors</option><option value="receiver">Receivers</option></select><select id="ustat"><option value="">All status</option><option value="active">Active</option><option value="suspended">Suspended</option></select><span style="color:var(--muted);font-size:12px">Up to 300 users</span></div><div class="card wrap" id="utable"></div>`;
+    ['uq', 'urole', 'ustat'].forEach((id) => $(id).oninput = drawUsers); drawUsers();
+  } catch (e) { showError(c, e); }
+}
+function drawUsers() {
+  const q = $('uq').value.toLowerCase(), role = $('urole').value, stat = $('ustat').value;
+  const rows = usersCache.filter((u) => (!role || u.role === role) && (!stat || (stat === 'suspended') === u._suspended) && [u.name, u.email, u.phone, u.city, u.country].join(' ').toLowerCase().includes(q));
+  if (!rows.length) { $('utable').innerHTML = '<div class="msg empty">No users found.</div>'; return; }
+  $('utable').innerHTML = `<table><thead><tr><th>Name</th><th>Contact</th><th>Role</th><th>Location</th><th>Blood</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((u) => `<tr>
+    <td><b>${esc(u.name)}</b><br><code>${esc(u.id)}</code></td><td>${esc(u.email)}<br>${esc(u.phone)}</td>
+    <td><span class="pill blue">${esc(u.role)}</span></td><td>${esc(u.city)}${u.area ? ', ' + esc(u.area) : ''}<br><code>${esc(u.country)}</code></td><td>${esc(u.bloodGroup)}</td>
+    <td><span class="pill ${u._suspended ? 'red' : 'green'}">${u._suspended ? 'Suspended' : 'Active'}</span></td>
+    <td><button class="btn small ${u._suspended ? 'green' : 'ghost'}" data-act="${u._suspended ? 'enable' : 'suspend'}" data-uid="${esc(u.id)}">${u._suspended ? 'Enable' : 'Suspend'}</button></td></tr>`).join('')}</tbody></table>`;
+}
+
+// Free-plan suspension: rules block every write from a suspended user,
+// and the app signs them out at login. No Cloud Functions needed.
+async function setSuspended(uid, suspend, reason) {
+  const batch = writeBatch(db);
+  const suspRef = doc(db, 'suspended_users', uid);
+  if (suspend) batch.set(suspRef, { reason, adminUid: auth.currentUser.uid, createdAt: serverTimestamp() }); else batch.delete(suspRef);
+  batch.set(doc(db, 'users', uid), { isActive: !suspend, updatedAt: serverTimestamp() }, { merge: true });
+  const dp = await getDoc(doc(db, 'donor_profiles', uid));
+  if (dp.exists()) batch.update(dp.ref, { isActive: !suspend, updatedAt: serverTimestamp() });
+  batch.set(doc(collection(db, 'admin_audit')), { action: suspend ? 'suspend_account' : 'enable_account', targetUid: uid, adminUid: auth.currentUser.uid, reason: reason || '', createdAt: serverTimestamp() });
+  await batch.commit();
+}
+async function toggleAccount(uid, suspend) {
+  const r = suspend
+    ? await ask({ title: 'Suspend this account?', text: 'The user will be signed out and blocked from sending or responding to requests. The reason is saved in the audit log.', input: 'Reason', confirmLabel: 'Suspend' })
+    : await ask({ title: 'Enable this account?', text: 'The user will be able to use the app again.', confirmLabel: 'Enable' });
+  if (!r) return;
+  try { await setSuspended(uid, suspend, suspend ? r : ''); toast(suspend ? 'Account suspended.' : 'Account enabled.', 'ok'); render(); }
+  catch (e) { toast('Failed: ' + (e.code === 'permission-denied' ? 'permission denied' : e.message), 'err'); }
+}
+
+// ---------------- requests ----------------
+async function renderRequests() {
+  const c = $('content');
+  try {
+    const snap = await getDocs(query(collection(db, 'blood_requests'), orderBy('createdAt', 'desc'), limit(100)));
+    if (snap.empty) { c.innerHTML = '<div class="card msg empty">No blood requests yet.</div>'; return; }
+    window.__reqs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    c.innerHTML = `<div class="row"><select id="rstat"><option value="">All status</option><option>pending</option><option>accepted</option><option>completed</option><option>cancelled</option></select><input id="rq" placeholder="Search hospital, city, patient..."></div><div class="card wrap" id="rtable"></div>`;
+    $('rstat').oninput = $('rq').oninput = drawRequests; drawRequests();
+  } catch (e) { showError(c, e); }
+}
+function drawRequests() {
+  const s = $('rstat').value, q = $('rq').value.toLowerCase();
+  const rows = window.__reqs.filter((r) => (!s || r.status === s) && [r.hospitalName, r.city, r.patientName, r.requesterName].join(' ').toLowerCase().includes(q));
+  if (!rows.length) { $('rtable').innerHTML = '<div class="msg empty">No matching requests.</div>'; return; }
+  $('rtable').innerHTML = `<table><thead><tr><th>Created</th><th>Blood</th><th>Units</th><th>Hospital</th><th>Requester</th><th>Urgency</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr>
+    <td>${esc(fmt(r.createdAt))}</td><td><b>${esc(r.bloodGroup)}</b></td><td>${esc(r.unitsRequired)}</td><td>${esc(r.hospitalName)}<br><code>${esc(r.city)}${r.country ? ', ' + esc(r.country) : ''}</code></td>
+    <td>${esc(r.requesterName)}<br><code>${esc(r.requesterId)}</code></td><td>${esc(r.urgency)}</td>
+    <td><span class="pill ${r.status === 'pending' ? 'orange' : r.status === 'cancelled' ? 'red' : 'green'}">${esc(r.status)}</span></td>
+    <td>${r.status === 'pending' ? `<button class="btn small ghost" data-act="cancelReq" data-id="${esc(r.id)}">Cancel</button>` : ''}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// ---------------- reports ----------------
+async function renderReports() {
+  const c = $('content');
+  try {
+    const snap = await getDocs(query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100)));
+    if (snap.empty) { c.innerHTML = '<div class="card msg empty">No reports yet.</div>'; return; }
+    c.innerHTML = `<div class="card wrap"><table><thead><tr><th>Date</th><th>Reason</th><th>Reported user</th><th>Reporter</th><th>Status</th><th></th></tr></thead><tbody>${snap.docs.map((d) => {
+      const r = d.data(), open = r.status === 'open';
+      return `<tr><td>${esc(fmt(r.createdAt))}</td><td><b>${esc(r.reason)}</b><br>${esc(r.description)}</td><td><code>${esc(r.reportedUserId)}</code></td><td><code>${esc(r.reporterId)}</code></td>
+        <td><span class="pill ${open ? 'orange' : 'green'}">${esc(r.status)}</span></td>
+        <td>${open ? `<button class="btn small" data-act="suspend" data-uid="${esc(r.reportedUserId)}">Suspend user</button> <button class="btn small green" data-act="report" data-id="${esc(d.id)}" data-status="resolved">Resolve</button> <button class="btn small ghost" data-act="report" data-id="${esc(d.id)}" data-status="dismissed">Dismiss</button>` : ''}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  } catch (e) { showError(c, e); }
+}
+
+// ---------------- blood camps ----------------
+let campsCache = [];
+const campDate = (k) => (k.date && k.date.toDate ? k.date.toDate() : null);
+
+async function renderCamps() {
+  const c = $('content');
+  try {
+    const snap = await getDocs(query(collection(db, 'blood_camps'), orderBy('date', 'desc'), limit(300)));
+    const uids = [...new Set(snap.docs.map((d) => d.data().createdBy).filter(Boolean))];
+    const users = {};
+    await Promise.all(uids.map(async (uid) => {
+      try { const u = await getDoc(doc(db, 'users', uid)); if (u.exists()) users[uid] = u.data(); } catch (e) { /* user may be deleted */ }
+    }));
+    campsCache = snap.docs.map((d) => ({ id: d.id, ...d.data(), _poster: users[d.data().createdBy] || null }));
+    c.innerHTML = `<div class="row"><input id="cq" placeholder="Search title, city, organizer, poster name / email / phone / ID..."><select id="cstat"><option value="">All camps</option><option value="upcoming">Upcoming</option><option value="past">Past</option></select><button class="btn" data-act="addCamp">+ Add camp</button><span style="color:var(--muted);font-size:12px">Latest 300 camps</span></div><div class="card wrap" id="ctable"></div>`;
+    $('cq').oninput = drawCamps; $('cstat').onchange = drawCamps; drawCamps();
+  } catch (e) { showError(c, e); }
+}
+
+function drawCamps() {
+  const q = $('cq').value.trim().toLowerCase(), st = $('cstat').value;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const rows = campsCache.filter((k) => {
+    const d = campDate(k), upcoming = !!d && d >= today;
+    if (st === 'upcoming' && !upcoming) return false;
+    if (st === 'past' && upcoming) return false;
+    if (!q) return true;
+    const p = k._poster || {};
+    return [k.title, k.city, k.address, k.organizer, k.organizerType, k.createdBy, p.name, p.email, p.phone]
+      .some((v) => String(v ?? '').toLowerCase().includes(q));
+  });
+  if (!rows.length) { $('ctable').innerHTML = '<div class="msg empty">No camps found.</div>'; return; }
+  const me = auth.currentUser.uid;
+  $('ctable').innerHTML = `<table><thead><tr><th>Camp date</th><th>Camp</th><th>Place</th><th>Posted by</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((k) => {
+    const d = campDate(k), upcoming = !!d && d >= today, p = k._poster;
+    const poster = k.createdBy === me
+      ? '<span class="pill blue">Admin (you)</span>'
+      : `<b>${esc(p ? p.name : k.organizer)}</b>${p ? `<br>${esc(p.email)}<br>${esc(p.phone)}` : '<br><i>account not found</i>'}<br><code>${esc(k.createdBy)}</code><br><span style="color:var(--muted);font-size:12px">${esc(fmt(k.createdAt))}</span>`;
+    return `<tr><td>${esc(d ? d.toLocaleDateString() : '')}<br>${esc(k.timeText)}</td>
+      <td><b>${esc(k.title)}</b><br>${esc(k.organizer)} <span class="pill">${esc(k.organizerType)}</span>${k.phone ? '<br>' + esc(k.phone) : ''}${k.description ? `<br><span style="color:var(--muted)">${esc(k.description)}</span>` : ''}</td>
+      <td>${esc(k.address)}<br>${esc(k.city)}</td><td>${poster}</td>
+      <td><span class="pill ${upcoming ? 'green' : ''}">${upcoming ? 'Upcoming' : 'Past'}</span></td>
+      <td><button class="btn small" data-act="deleteCamp" data-id="${esc(k.id)}">Delete</button>${k.createdBy !== me ? ` <button class="btn small ghost" data-act="suspend" data-uid="${esc(k.createdBy)}">Suspend poster</button>` : ''}</td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+async function deleteCamp(id) {
+  const k = campsCache.find((x) => x.id === id); if (!k) return;
+  const reason = await ask({ title: 'Delete this camp?', text: `"${k.title}" will be removed for everyone in the app. The reason is saved in the audit log.`, input: 'Reason (for example: fake camp)', confirmLabel: 'Delete camp' });
+  if (!reason) return;
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'blood_camps', id));
+  batch.set(doc(collection(db, 'admin_audit')), { action: 'delete_camp', targetUid: k.createdBy || '', adminUid: auth.currentUser.uid, reason: k.title + ' - ' + reason, createdAt: serverTimestamp() });
+  await batch.commit();
+  toast('Camp deleted.', 'ok'); render();
+}
+
+// Best effort: find the map position so the app can match camps by distance.
+async function geocode(text) {
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(text));
+    const j = await r.json();
+    if (Array.isArray(j) && j.length) return { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
+  } catch (e) { /* the camp is still saved with its city name */ }
+  return null;
+}
+
+function addCampModal() {
+  const o = document.createElement('div'); o.className = 'overlay';
+  const today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+  o.innerHTML = `<div class="modal" style="max-width:460px;max-height:92vh;overflow:auto"><h3>Add a blood camp</h3>
+    <label>Camp / event title</label><input id="kTitle" maxlength="80">
+    <label>Organizer name</label><input id="kOrg" maxlength="80" value="BloodConnect">
+    <label>Organizer type</label><select id="kType"><option>Hospital</option><option>Blood Donor</option><option selected>Organization / NGO</option><option>Other</option></select>
+    <label>City</label><input id="kCity" maxlength="60">
+    <label>Address / venue</label><input id="kAddr" maxlength="160">
+    <label>Date</label><input id="kDate" type="date" min="${today.toISOString().slice(0, 10)}">
+    <label>Time (for example 10:00 AM - 4:00 PM)</label><input id="kTime" maxlength="60">
+    <label>Phone (optional)</label><input id="kPhone" maxlength="20">
+    <label>Description (optional)</label><textarea id="kDesc" rows="3" maxlength="300"></textarea>
+    <div id="kMsg"></div>
+    <div class="actions"><button class="btn gray" id="kNo">Cancel</button><button class="btn" id="kYes">Post camp</button></div></div>`;
+  document.body.appendChild(o);
+  o.querySelector('#kNo').onclick = () => o.remove();
+  o.querySelector('#kYes').onclick = async () => {
+    const v = (id) => o.querySelector('#' + id).value.trim();
+    const fail = (m) => { o.querySelector('#kMsg').innerHTML = `<div class="msg err">${esc(m)}</div>`; };
+    const [title, org, city, addr, dateStr, timeText, phone, desc] = ['kTitle', 'kOrg', 'kCity', 'kAddr', 'kDate', 'kTime', 'kPhone', 'kDesc'].map(v);
+    if (title.length < 3) return fail('Enter a title (at least 3 letters).');
+    if (org.length < 2) return fail('Enter the organizer name.');
+    if (city.length < 2) return fail('Enter the city.');
+    if (addr.length < 3) return fail('Enter the address or venue.');
+    if (!dateStr) return fail('Choose the date.');
+    if (phone && !/^[0-9+\-\s()]{6,20}$/.test(phone)) return fail('Enter a valid phone number.');
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const btn = o.querySelector('#kYes'); btn.disabled = true;
+    try {
+      const geo = (await geocode(addr + ', ' + city)) || (await geocode(city));
+      const data = { title, organizer: org, organizerType: v('kType'), city, address: addr, date: Timestamp.fromDate(new Date(y, m - 1, d)), timeText, phone, description: desc, createdBy: auth.currentUser.uid, createdAt: serverTimestamp() };
+      if (geo) { data.latitude = geo.lat; data.longitude = geo.lng; }
+      const ref = doc(collection(db, 'blood_camps'));
+      const batch = writeBatch(db);
+      batch.set(ref, data);
+      batch.set(doc(collection(db, 'admin_audit')), { action: 'add_camp', targetUid: '', adminUid: auth.currentUser.uid, reason: title, createdAt: serverTimestamp() });
+      await batch.commit();
+      o.remove(); toast('Camp posted.', 'ok'); render();
+    } catch (e) { btn.disabled = false; fail('Failed: ' + (e.code === 'permission-denied' ? 'permission denied' : e.message)); }
+  };
+}
+
+// ---------------- audit log ----------------
+async function renderAudit() {
+  const c = $('content');
+  try {
+    const snap = await getDocs(query(collection(db, 'admin_audit'), orderBy('createdAt', 'desc'), limit(100)));
+    if (snap.empty) { c.innerHTML = '<div class="card msg empty">No admin actions recorded yet.</div>'; return; }
+    c.innerHTML = `<div class="card wrap"><table><thead><tr><th>When</th><th>Action</th><th>Target user</th><th>By admin</th><th>Reason</th></tr></thead><tbody>${snap.docs.map((d) => { const a = d.data(); return `<tr><td>${esc(fmt(a.createdAt))}</td><td><span class="pill blue">${esc(a.action)}</span></td><td><code>${esc(a.targetUid)}</code></td><td><code>${esc(a.adminUid)}</code></td><td>${esc(a.reason)}</td></tr>`; }).join('')}</tbody></table></div>`;
+  } catch (e) { showError(c, e); }
+}
+
+// ---------------- clicks (event delegation, no inline JS) ----------------
+document.addEventListener('click', async (ev) => {
+  const b = ev.target.closest('button[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  try {
+    if (act === 'suspend') await toggleAccount(b.dataset.uid, true);
+    else if (act === 'enable') await toggleAccount(b.dataset.uid, false);
+    else if (act === 'deleteCamp') await deleteCamp(b.dataset.id);
+    else if (act === 'addCamp') addCampModal();
+    else if (act === 'cancelReq') {
+      if (await ask({ title: 'Cancel this blood request?', text: 'The requester will see it as cancelled.', confirmLabel: 'Cancel request' })) {
+        await updateDoc(doc(db, 'blood_requests', b.dataset.id), { status: 'cancelled', updatedAt: serverTimestamp() }); toast('Request cancelled.', 'ok'); render();
+      }
+    } else if (act === 'report') { await updateDoc(doc(db, 'reports', b.dataset.id), { status: b.dataset.status, updatedAt: serverTimestamp() }); toast('Report ' + b.dataset.status + '.', 'ok'); render(); }
+  } catch (e) { toast('Failed: ' + (e.code === 'permission-denied' ? 'permission denied' : e.message), 'err'); }
+});
+</script>
+</body>
+</html>

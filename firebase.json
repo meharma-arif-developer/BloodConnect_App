@@ -1,0 +1,69 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "bloodconnect-f8c69",
+          "appId": "1:516582333359:android:48cd762d8896903e69ad5a",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "bloodconnect-f8c69",
+          "configurations": {
+            "android": "1:516582333359:android:48cd762d8896903e69ad5a",
+            "ios": "1:516582333359:ios:dc6d412f7af5e19569ad5a",
+            "macos": "1:516582333359:ios:dc6d412f7af5e19569ad5a",
+            "web": "1:516582333359:web:c820a38ad15fd05f69ad5a",
+            "windows": "1:516582333359:web:3583333d0df0253369ad5a"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true,
+    "functions": {
+      "port": 5001
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "site": "bloodconnect-life",
+    "public": "admin_panel",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "cleanUrls": true
+  }
+}

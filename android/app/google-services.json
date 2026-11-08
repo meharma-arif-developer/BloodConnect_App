@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "516582333359",
+    "project_id": "bloodconnect-f8c69",
+    "storage_bucket": "bloodconnect-f8c69.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:516582333359:android:48cd762d8896903e69ad5a",
+        "android_client_info": {
+          "package_name": "com.example.blood_connect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCU_Qx09xkeS3LQuAbDLyd8-kOUwAnKh10"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
