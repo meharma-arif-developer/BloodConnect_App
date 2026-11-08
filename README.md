@@ -127,6 +127,15 @@ BloodConnect follows a client–backend architecture.
 - **Cloud Firestore:** Stores user profiles, donor information, blood requests, and related records.
 - **Firebase Security Rules:** Define access permissions for supported database operations.
 
+
+
+## 📱 Download App (Android App)
+
+[⬇️ Download APK](https://github.com/meharma-arif-developer/BloodConnect_App/releases/download/v1.0.0/app-release.apk)
+
+
+
+
 ## 🛠️ Technology Stack
 
 | Technology | Purpose |
